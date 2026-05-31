@@ -51,8 +51,10 @@ function iterate($iterator, $parentKey, $DB)
             if (!empty($configID)) {
                 $dbParentKey = $db->pselectone(
                     "SELECT Name 
-                     FROM ConfigSettings 
-                     WHERE ID=(SELECT Parent FROM ConfigSettings WHERE Name=:name)",
+                     FROM ConfigCategories
+                     WHERE ID=(
+                        SELECT CategoryID FROM ConfigSettings WHERE Name=:name
+                     )",
                     ['name' => $name]
                 );
                 if ($parentKey==$dbParentKey) {
