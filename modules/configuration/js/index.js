@@ -8398,6 +8398,8 @@ var exports = __webpack_exports__;
   \*********************************************/
 
 
+var _interopRequireDefault = __webpack_require__(/*! @babel/runtime/helpers/interopRequireDefault */ "./node_modules/@babel/runtime/helpers/interopRequireDefault.js");
+var _typeof2 = _interopRequireDefault(__webpack_require__(/*! @babel/runtime/helpers/typeof */ "./node_modules/@babel/runtime/helpers/typeof.js"));
 var __assign = void 0 && (void 0).__assign || function () {
   __assign = Object.assign || function (t) {
     for (var s, i = 1, n = arguments.length; i < n; i++) {
@@ -8593,6 +8595,25 @@ function SingleValueInput(props) {
       return props.reloadCategory();
     })["catch"](showSaveError);
   };
+  var saveMappingChange = function saveMappingChange(newValue) {
+    if (mappingEquals(newValue, mappingFromValue(props.item.Value))) {
+      return;
+    }
+    saveSetting(props.baseURL, props.item.Name, {
+      value: newValue
+    }).then(function () {
+      return props.reloadCategory();
+    })["catch"](showSaveError);
+  };
+  if (props.item.DataType === 'mapping') {
+    return /*#__PURE__*/React.createElement(MappingInput, {
+      disabled: props.item.Disabled,
+      label: props.item.Label,
+      name: props.item.Name,
+      onSave: saveMappingChange,
+      value: mappingFromValue(value)
+    });
+  }
   return renderInput({
     dataType: props.item.DataType,
     disabled: props.item.Disabled,
@@ -8611,6 +8632,14 @@ function SingleValueInput(props) {
  * @return {JSX}
  */
 function MultiValueInput(props) {
+  if (props.item.DataType === 'mapping') {
+    return /*#__PURE__*/React.createElement(MappingMultiValueInput, {
+      baseURL: props.baseURL,
+      item: props.item,
+      options: props.options,
+      reloadCategory: props.reloadCategory
+    });
+  }
   var values = Array.isArray(props.item.Value) ? props.item.Value.map(String) : [];
   var _a = __read((0, react_1.useState)(false), 2),
     isAdding = _a[0],
@@ -8686,6 +8715,229 @@ function MultiValueInput(props) {
   }, /*#__PURE__*/React.createElement("span", {
     className: "glyphicon glyphicon-plus"
   }), " Add field")));
+}
+/**
+ * Multi-value mapping configuration input.
+ *
+ * @param {ItemDisplayProps} props React props
+ * @return {JSX}
+ */
+function MappingMultiValueInput(props) {
+  var values = mappingArrayFromValue(props.item.Value);
+  var _a = __read((0, react_1.useState)(false), 2),
+    isAdding = _a[0],
+    setIsAdding = _a[1];
+  var saveValues = function saveValues(newValues) {
+    saveSetting(props.baseURL, props.item.Name, {
+      values: newValues
+    }).then(function () {
+      setIsAdding(false);
+      props.reloadCategory();
+    })["catch"](showSaveError);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "form-group",
+    title: props.item.Description
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "col-sm-3"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "col-sm-12 control-label config-name"
+  }, props.item.Label), /*#__PURE__*/React.createElement(DevName, {
+    enabled: props.options.sandbox,
+    name: props.item.Name
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "col-sm-9"
+  }, values.map(function (value, idx) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "input-group entry",
+      key: "".concat(props.item.Name, "-").concat(idx)
+    }, /*#__PURE__*/React.createElement(MappingInput, {
+      disabled: props.item.Disabled,
+      name: props.item.Name,
+      onSave: function onSave(newValue) {
+        var newValues = __spreadArray([], __read(values), false);
+        newValues[idx] = newValue;
+        saveValues(newValues);
+      },
+      value: value
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "input-group-btn"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-danger btn-remove",
+      disabled: props.item.Disabled,
+      onClick: function onClick() {
+        return saveValues(values.filter(function (_el, i) {
+          return i !== idx;
+        }));
+      },
+      type: "button"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "glyphicon glyphicon-remove"
+    }), "\xA0")));
+  }), isAdding && /*#__PURE__*/React.createElement("div", {
+    className: "input-group entry"
+  }, /*#__PURE__*/React.createElement(MappingInput, {
+    disabled: props.item.Disabled,
+    name: props.item.Name,
+    onSave: function onSave(newValue) {
+      return saveValues(__spreadArray(__spreadArray([], __read(values), false), [newValue], false));
+    },
+    value: {
+      value: '',
+      mappedValue: ''
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "input-group-btn"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-danger btn-remove",
+    disabled: props.item.Disabled,
+    onClick: function onClick() {
+      return setIsAdding(false);
+    },
+    type: "button"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "glyphicon glyphicon-remove"
+  }), "\xA0"))), !isAdding && /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-success add",
+    disabled: props.item.Disabled,
+    onClick: function onClick() {
+      return setIsAdding(true);
+    },
+    type: "button"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "glyphicon glyphicon-plus"
+  }), " Add field")));
+}
+/**
+ * Mapping value input.
+ *
+ * @param {MappingInputProps} props React props
+ * @return {JSX}
+ */
+function MappingInput(props) {
+  var _a;
+  var _b = __read((0, react_1.useState)((_a = props.value) !== null && _a !== void 0 ? _a : {
+      value: '',
+      mappedValue: ''
+    }), 2),
+    value = _b[0],
+    setValue = _b[1];
+  var valueInput = (0, react_1.useRef)(null);
+  var mappedInput = (0, react_1.useRef)(null);
+  (0, react_1.useEffect)(function () {
+    var _a;
+    setValue((_a = props.value) !== null && _a !== void 0 ? _a : {
+      value: '',
+      mappedValue: ''
+    });
+  }, [props.value]);
+  var setField = function setField(field, fieldValue) {
+    var _a;
+    setValue(__assign(__assign({}, value), (_a = {}, _a[field] = fieldValue, _a)));
+  };
+  var saveField = function saveField(field, fieldValue) {
+    var _a;
+    var nextValue = __assign(__assign({}, value), (_a = {}, _a[field] = fieldValue, _a));
+    window.setTimeout(function () {
+      if (document.activeElement !== valueInput.current && document.activeElement !== mappedInput.current) {
+        props.onSave(nextValue);
+      }
+    }, 0);
+  };
+  var inputs = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+    "aria-label": "Value",
+    className: "form-control",
+    disabled: props.disabled,
+    name: "".concat(props.name, "-value"),
+    onBlur: function onBlur(e) {
+      return saveField('value', e.currentTarget.value);
+    },
+    onChange: function onChange(e) {
+      return setField('value', e.currentTarget.value);
+    },
+    ref: valueInput,
+    type: "text",
+    value: value.value
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "input-group-addon"
+  }, "to"), /*#__PURE__*/React.createElement("input", {
+    "aria-label": "Mapped value",
+    className: "form-control",
+    disabled: props.disabled,
+    name: "".concat(props.name, "-mapped-value"),
+    onBlur: function onBlur(e) {
+      return saveField('mappedValue', e.currentTarget.value);
+    },
+    onChange: function onChange(e) {
+      return setField('mappedValue', e.currentTarget.value);
+    },
+    ref: mappedInput,
+    type: "text",
+    value: value.mappedValue
+  }));
+  if (props.label === undefined) {
+    return inputs;
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "form-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "col-sm-3 control-label",
+    htmlFor: "".concat(props.name, "-value")
+  }, props.label), /*#__PURE__*/React.createElement("div", {
+    className: "col-sm-9"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "input-group"
+  }, inputs)));
+}
+/**
+ * Normalize a mapping value returned by the API.
+ *
+ * @param {ConfigValue} value API config value
+ * @return {ConfigMappingPayload}
+ */
+function mappingFromValue(value) {
+  var _a, _b;
+  if (isConfigMapping(value)) {
+    return {
+      mappedValue: String((_a = value.MappedValue) !== null && _a !== void 0 ? _a : ''),
+      value: String((_b = value.Value) !== null && _b !== void 0 ? _b : '')
+    };
+  }
+  return {
+    value: '',
+    mappedValue: ''
+  };
+}
+/**
+ * Normalize mapping rows returned by the API.
+ *
+ * @param {ConfigValue} value API config value
+ * @return {ConfigMappingPayload[]}
+ */
+function mappingArrayFromValue(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(isConfigMapping).map(mappingFromValue);
+}
+/**
+ * Check whether a value is a mapping API object.
+ *
+ * @param {unknown} value Value to check
+ * @return {boolean}
+ */
+function isConfigMapping(value) {
+  return value !== null && (0, _typeof2["default"])(value) === 'object' && !Array.isArray(value) && ('Value' in value || 'MappedValue' in value);
+}
+/**
+ * Compare mapping payloads.
+ *
+ * @param {ConfigMappingPayload} a First value
+ * @param {ConfigMappingPayload} b Second value
+ * @return {boolean}
+ */
+function mappingEquals(a, b) {
+  return a.value === b.value && a.mappedValue === b.mappedValue;
 }
 /**
  * One row in a multi-value input.

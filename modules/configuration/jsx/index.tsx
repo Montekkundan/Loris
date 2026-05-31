@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import swal from 'sweetalert2';
 import {
@@ -26,7 +26,23 @@ const DATA_TYPE_OPTIONS: Record<string, ConfigOptionKey> = {
   scan_type: 'scanTypes',
 };
 
-type ConfigValue = string | number | boolean | string[] | null;
+type ConfigMapping = {
+  MappedValue?: string | null,
+  Value?: string | null,
+};
+
+type ConfigMappingPayload = {
+  mappedValue: string,
+  value: string,
+};
+
+type ConfigValue = string
+  | number
+  | boolean
+  | string[]
+  | ConfigMapping
+  | ConfigMapping[]
+  | null;
 
 type ConfigCategory = {
   Name: string,
@@ -98,6 +114,14 @@ type MultiValueRowProps = {
   onSave: (newValue: string) => void,
   options: ConfigOptions,
   value?: string,
+};
+
+type MappingInputProps = {
+  disabled: boolean,
+  label?: string,
+  name: string,
+  onSave: (newValue: ConfigMappingPayload) => void,
+  value?: ConfigMappingPayload,
 };
 
 type RenderInputConfig = {
@@ -268,6 +292,27 @@ function SingleValueInput(props: ItemDisplayProps): React.ReactElement {
       .catch(showSaveError);
   };
 
+  const saveMappingChange = (newValue: ConfigMappingPayload) => {
+    if (mappingEquals(newValue, mappingFromValue(props.item.Value))) {
+      return;
+    }
+    saveSetting(props.baseURL, props.item.Name, {value: newValue})
+      .then(() => props.reloadCategory())
+      .catch(showSaveError);
+  };
+
+  if (props.item.DataType === 'mapping') {
+    return (
+      <MappingInput
+        disabled={props.item.Disabled}
+        label={props.item.Label}
+        name={props.item.Name}
+        onSave={saveMappingChange}
+        value={mappingFromValue(value)}
+      />
+    );
+  }
+
   return renderInput({
     dataType: props.item.DataType,
     disabled: props.item.Disabled,
@@ -287,6 +332,17 @@ function SingleValueInput(props: ItemDisplayProps): React.ReactElement {
  * @return {JSX}
  */
 function MultiValueInput(props: ItemDisplayProps): React.ReactElement {
+  if (props.item.DataType === 'mapping') {
+    return (
+      <MappingMultiValueInput
+        baseURL={props.baseURL}
+        item={props.item}
+        options={props.options}
+        reloadCategory={props.reloadCategory}
+      />
+    );
+  }
+
   const values = Array.isArray(props.item.Value) ?
     props.item.Value.map(String) :
     [];
@@ -361,6 +417,232 @@ function MultiValueInput(props: ItemDisplayProps): React.ReactElement {
       </div>
     </div>
   );
+}
+
+/**
+ * Multi-value mapping configuration input.
+ *
+ * @param {ItemDisplayProps} props React props
+ * @return {JSX}
+ */
+function MappingMultiValueInput(props: ItemDisplayProps): React.ReactElement {
+  const values = mappingArrayFromValue(props.item.Value);
+  const [isAdding, setIsAdding] = useState(false);
+
+  const saveValues = (newValues: ConfigMappingPayload[]) => {
+    saveSetting(props.baseURL, props.item.Name, {values: newValues})
+      .then(() => {
+        setIsAdding(false);
+        props.reloadCategory();
+      })
+      .catch(showSaveError);
+  };
+
+  return (
+    <div className="form-group" title={props.item.Description}>
+      <div className="col-sm-3">
+        <label className="col-sm-12 control-label config-name">
+          {props.item.Label}
+        </label>
+        <DevName enabled={props.options.sandbox} name={props.item.Name} />
+      </div>
+      <div className="col-sm-9">
+        {values.map((value, idx) => (
+          <div className="input-group entry" key={`${props.item.Name}-${idx}`}>
+            <MappingInput
+              disabled={props.item.Disabled}
+              name={props.item.Name}
+              onSave={(newValue) => {
+                const newValues = [...values];
+                newValues[idx] = newValue;
+                saveValues(newValues);
+              }}
+              value={value}
+            />
+            <div className="input-group-btn">
+              <button
+                className="btn btn-danger btn-remove"
+                disabled={props.item.Disabled}
+                onClick={() => saveValues(values.filter((_el, i) => i !== idx))}
+                type="button"
+              >
+                <span className="glyphicon glyphicon-remove"></span>&nbsp;
+              </button>
+            </div>
+          </div>
+        ))}
+        {isAdding && (
+          <div className="input-group entry">
+            <MappingInput
+              disabled={props.item.Disabled}
+              name={props.item.Name}
+              onSave={(newValue) => saveValues([...values, newValue])}
+              value={{value: '', mappedValue: ''}}
+            />
+            <div className="input-group-btn">
+              <button
+                className="btn btn-danger btn-remove"
+                disabled={props.item.Disabled}
+                onClick={() => setIsAdding(false)}
+                type="button"
+              >
+                <span className="glyphicon glyphicon-remove"></span>&nbsp;
+              </button>
+            </div>
+          </div>
+        )}
+        {!isAdding && (
+          <button
+            className="btn btn-success add"
+            disabled={props.item.Disabled}
+            onClick={() => setIsAdding(true)}
+            type="button"
+          >
+            <span className="glyphicon glyphicon-plus"></span> Add field
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Mapping value input.
+ *
+ * @param {MappingInputProps} props React props
+ * @return {JSX}
+ */
+function MappingInput(props: MappingInputProps): React.ReactElement {
+  const [value, setValue] = useState<ConfigMappingPayload>(
+    props.value ?? {value: '', mappedValue: ''}
+  );
+  const valueInput = useRef<HTMLInputElement>(null);
+  const mappedInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setValue(props.value ?? {value: '', mappedValue: ''});
+  }, [props.value]);
+
+  const setField = (
+    field: keyof ConfigMappingPayload,
+    fieldValue: string
+  ) => {
+    setValue({...value, [field]: fieldValue});
+  };
+
+  const saveField = (
+    field: keyof ConfigMappingPayload,
+    fieldValue: string
+  ) => {
+    const nextValue = {...value, [field]: fieldValue};
+    window.setTimeout(() => {
+      if (
+        document.activeElement !== valueInput.current
+        && document.activeElement !== mappedInput.current
+      ) {
+        props.onSave(nextValue);
+      }
+    }, 0);
+  };
+
+  const inputs = (
+    <>
+      <input
+        aria-label="Value"
+        className="form-control"
+        disabled={props.disabled}
+        name={`${props.name}-value`}
+        onBlur={(e) => saveField('value', e.currentTarget.value)}
+        onChange={(e) => setField('value', e.currentTarget.value)}
+        ref={valueInput}
+        type="text"
+        value={value.value}
+      />
+      <span className="input-group-addon">to</span>
+      <input
+        aria-label="Mapped value"
+        className="form-control"
+        disabled={props.disabled}
+        name={`${props.name}-mapped-value`}
+        onBlur={(e) => saveField('mappedValue', e.currentTarget.value)}
+        onChange={(e) => setField('mappedValue', e.currentTarget.value)}
+        ref={mappedInput}
+        type="text"
+        value={value.mappedValue}
+      />
+    </>
+  );
+
+  if (props.label === undefined) {
+    return inputs;
+  }
+
+  return (
+    <div className="form-group">
+      <label className="col-sm-3 control-label" htmlFor={`${props.name}-value`}>
+        {props.label}
+      </label>
+      <div className="col-sm-9">
+        <div className="input-group">{inputs}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Normalize a mapping value returned by the API.
+ *
+ * @param {ConfigValue} value API config value
+ * @return {ConfigMappingPayload}
+ */
+function mappingFromValue(value: ConfigValue): ConfigMappingPayload {
+  if (isConfigMapping(value)) {
+    return {
+      mappedValue: String(value.MappedValue ?? ''),
+      value: String(value.Value ?? ''),
+    };
+  }
+  return {value: '', mappedValue: ''};
+}
+
+/**
+ * Normalize mapping rows returned by the API.
+ *
+ * @param {ConfigValue} value API config value
+ * @return {ConfigMappingPayload[]}
+ */
+function mappingArrayFromValue(value: ConfigValue): ConfigMappingPayload[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(isConfigMapping).map(mappingFromValue);
+}
+
+/**
+ * Check whether a value is a mapping API object.
+ *
+ * @param {unknown} value Value to check
+ * @return {boolean}
+ */
+function isConfigMapping(value: unknown): value is ConfigMapping {
+  return value !== null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && ('Value' in value || 'MappedValue' in value);
+}
+
+/**
+ * Compare mapping payloads.
+ *
+ * @param {ConfigMappingPayload} a First value
+ * @param {ConfigMappingPayload} b Second value
+ * @return {boolean}
+ */
+function mappingEquals(
+  a: ConfigMappingPayload,
+  b: ConfigMappingPayload
+): boolean {
+  return a.value === b.value && a.mappedValue === b.mappedValue;
 }
 
 /**

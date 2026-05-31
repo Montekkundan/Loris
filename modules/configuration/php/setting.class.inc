@@ -89,13 +89,17 @@ class Setting extends \NDB_Page implements RequestHandlerInterface
         $DB = $this->loris->getDatabaseConnection();
 
         $settingData = $DB->pselectRow(
-            "SELECT ID, AllowMultiple
+            "SELECT ID, AllowMultiple, DataType
              FROM ConfigSettings
              WHERE Name=:setting AND Visible=1",
             ['setting' => $setting]
         );
         if ($settingData === null) {
             return new \LORIS\Http\Response\JSON\NotFound("Setting not found");
+        }
+
+        if ($settingData['DataType'] === 'mapping') {
+            return $this->_saveMappingValue($settingData, $input);
         }
 
         if (!empty($settingData['AllowMultiple'])) {
@@ -142,5 +146,80 @@ class Setting extends \NDB_Page implements RequestHandlerInterface
         }
 
         return new \LORIS\Http\Response\JSON\OK(['ok' => true]);
+    }
+
+    /**
+     * Save a mapping setting into Config and ConfigMappings.
+     *
+     * @param array $settingData The setting metadata row
+     * @param array $input       The parsed JSON input
+     *
+     * @return ResponseInterface
+     */
+    private function _saveMappingValue(
+        array $settingData,
+        array $input
+    ) : ResponseInterface {
+        $DB = $this->loris->getDatabaseConnection();
+
+        if (!empty($settingData['AllowMultiple'])) {
+            if (!isset($input['values']) || !is_array($input['values'])) {
+                return new \LORIS\Http\Response\JSON\BadRequest(
+                    "Missing setting values"
+                );
+            }
+            $values = $input['values'];
+        } else {
+            if (!isset($input['value']) || !is_array($input['value'])) {
+                return new \LORIS\Http\Response\JSON\BadRequest(
+                    "Missing setting value"
+                );
+            }
+            $values = [$input['value']];
+        }
+
+        foreach ($values as $value) {
+            if (!$this->_isMappingValue($value)) {
+                return new \LORIS\Http\Response\JSON\BadRequest(
+                    "Invalid mapping value"
+                );
+            }
+        }
+
+        $DB->beginTransaction();
+        $DB->delete("Config", ['ConfigID' => $settingData['ID']]);
+        foreach ($values as $value) {
+            $DB->unsafeInsert(
+                "Config",
+                [
+                    'ConfigID' => $settingData['ID'],
+                    'Value'    => $value['value'],
+                ]
+            );
+            $DB->unsafeInsert(
+                "ConfigMappings",
+                [
+                    'ConfigID' => $DB->lastInsertID,
+                    'Value'    => $value['mappedValue'],
+                ]
+            );
+        }
+        $DB->commit();
+
+        return new \LORIS\Http\Response\JSON\OK(['ok' => true]);
+    }
+
+    /**
+     * Validate a mapping payload value.
+     *
+     * @param mixed $value The mapping value to validate
+     *
+     * @return bool
+     */
+    private function _isMappingValue($value) : bool
+    {
+        return is_array($value)
+            && array_key_exists('value', $value)
+            && array_key_exists('mappedValue', $value);
     }
 }

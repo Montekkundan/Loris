@@ -163,19 +163,44 @@ class Categories extends \NDB_Page implements RequestHandlerInterface
             try {
                 $valueFromXML        = $config->getSettingFromXML($settingName);
                 $setting['Disabled'] = true;
-                $setting['Value']    = $setting['AllowMultiple'] === true
-                    ? (array) $valueFromXML
-                    : $valueFromXML;
+                if ($setting['DataType'] === 'mapping') {
+                    $setting['Value'] = $this->_formatMappingValue(
+                        $setting['AllowMultiple'],
+                        (array) $valueFromXML
+                    );
+                } else {
+                    $setting['Value'] = $setting['AllowMultiple'] === true
+                        ? (array) $valueFromXML
+                        : $valueFromXML;
+                }
             } catch (\ConfigurationException $e) {
                 $setting['Disabled'] = false;
-                $value = iterator_to_array(
-                    $DB->pselect(
-                        "SELECT ID, Value FROM Config WHERE ConfigID=:ID",
-                        ['ID' => $setting['ID']]
-                    )
-                );
+                if ($setting['DataType'] === 'mapping') {
+                    $value = iterator_to_array(
+                        $DB->pselect(
+                            "SELECT c.ID, c.Value, cm.Value AS MappedValue
+                             FROM Config c
+                             LEFT JOIN ConfigMappings cm ON cm.ConfigID=c.ID
+                             WHERE c.ConfigID=:ID
+                             ORDER BY c.ID",
+                            ['ID' => $setting['ID']]
+                        )
+                    );
+                } else {
+                    $value = iterator_to_array(
+                        $DB->pselect(
+                            "SELECT ID, Value FROM Config WHERE ConfigID=:ID",
+                            ['ID' => $setting['ID']]
+                        )
+                    );
+                }
 
-                if ($setting['AllowMultiple']) {
+                if ($setting['DataType'] === 'mapping') {
+                    $setting['Value'] = $this->_formatMappingValue(
+                        $setting['AllowMultiple'],
+                        $value
+                    );
+                } else if ($setting['AllowMultiple']) {
                     $setting['Value'] = array_column($value, 'Value');
                 } else if (count($value) === 1) {
                     $setting['Value'] = $value[0]['Value'];
@@ -186,5 +211,41 @@ class Categories extends \NDB_Page implements RequestHandlerInterface
         }
 
         return new \LORIS\Http\Response\JSON\OK(['category' => $configs]);
+    }
+
+    /**
+     * Format mapping values for the React configuration UI.
+     *
+     * @param bool  $allowMultiple Whether the setting accepts multiple mappings
+     * @param array $values        Mapping rows
+     *
+     * @return array
+     */
+    private function _formatMappingValue(bool $allowMultiple, array $values) : array
+    {
+        $mappings = array_map(
+            function ($value) {
+                if (!is_array($value)) {
+                    return [
+                        'Value'       => strval($value),
+                        'MappedValue' => '',
+                    ];
+                }
+                return [
+                    'Value'       => isset($value['Value'])
+                        ? strval($value['Value'])
+                        : '',
+                    'MappedValue' => isset($value['MappedValue'])
+                        ? strval($value['MappedValue'])
+                        : '',
+                ];
+            },
+            $values
+        );
+
+        if ($allowMultiple) {
+            return $mappings;
+        }
+        return $mappings[0] ?? ['Value' => '', 'MappedValue' => ''];
     }
 }
