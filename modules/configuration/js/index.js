@@ -8527,10 +8527,11 @@ function DevName(props) {
  */
 function CategoryDisplay(props) {
   var rows = props.items.map(function (item) {
-    return /*#__PURE__*/React.createElement(ItemDisplay, {
+    return /*#__PURE__*/React.createElement(ConfigTreeItem, {
       key: item.ID,
       baseURL: props.baseURL,
       item: item,
+      level: 0,
       options: props.options,
       reloadCategory: props.reloadCategory
     });
@@ -8538,6 +8539,58 @@ function CategoryDisplay(props) {
   return /*#__PURE__*/React.createElement("div", {
     className: "col-md-9"
   }, rows);
+}
+/**
+ * Collapsible configuration tree item.
+ *
+ * @param {ConfigTreeItemProps} props React props
+ * @return {JSX}
+ */
+function ConfigTreeItem(props) {
+  var _a;
+  var _b = __read((0, react_1.useState)(false), 2),
+    isOpen = _b[0],
+    setIsOpen = _b[1];
+  var children = (_a = props.item.Children) !== null && _a !== void 0 ? _a : [];
+  var hasInput = props.item.DataType !== null && props.item.DataType !== '';
+  var canExpand = hasInput || children.length > 0;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "config-tree-item",
+    style: {
+      marginLeft: "".concat(Math.min(props.level, 4) * 15, "px")
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "config-tree-header",
+    disabled: !canExpand,
+    onClick: function onClick() {
+      return setIsOpen(!isOpen);
+    },
+    type: "button"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "glyphicon glyphicon-chevron-".concat(isOpen ? 'down' : 'right')
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "config-tree-label"
+  }, props.item.Label || props.item.Name), /*#__PURE__*/React.createElement("span", {
+    className: "config-tree-name"
+  }, props.item.Name), props.item.Description && /*#__PURE__*/React.createElement("span", {
+    className: "config-tree-description"
+  }, props.item.Description)), isOpen && /*#__PURE__*/React.createElement("div", {
+    className: "config-tree-body"
+  }, hasInput && /*#__PURE__*/React.createElement(ItemDisplay, {
+    baseURL: props.baseURL,
+    item: props.item,
+    options: props.options,
+    reloadCategory: props.reloadCategory
+  }), children.map(function (child) {
+    return /*#__PURE__*/React.createElement(ConfigTreeItem, {
+      key: child.ID,
+      baseURL: props.baseURL,
+      item: child,
+      level: props.level + 1,
+      options: props.options,
+      reloadCategory: props.reloadCategory
+    });
+  })));
 }
 /**
  * Single configuration setting.
@@ -8574,9 +8627,10 @@ function ItemDisplay(props) {
  * @return {JSX}
  */
 function SingleValueInput(props) {
-  var _a = __read((0, react_1.useState)(props.item.Value), 2),
-    value = _a[0],
-    setValue = _a[1];
+  var _a;
+  var _b = __read((0, react_1.useState)(props.item.Value), 2),
+    value = _b[0],
+    setValue = _b[1];
   (0, react_1.useEffect)(function () {
     setValue(props.item.Value);
   }, [props.item.Value]);
@@ -8615,7 +8669,7 @@ function SingleValueInput(props) {
     });
   }
   return renderInput({
-    dataType: props.item.DataType,
+    dataType: (_a = props.item.DataType) !== null && _a !== void 0 ? _a : '',
     disabled: props.item.Disabled,
     label: props.item.Label,
     name: props.item.Name,
@@ -8632,6 +8686,7 @@ function SingleValueInput(props) {
  * @return {JSX}
  */
 function MultiValueInput(props) {
+  var _a;
   if (props.item.DataType === 'mapping') {
     return /*#__PURE__*/React.createElement(MappingMultiValueInput, {
       baseURL: props.baseURL,
@@ -8641,9 +8696,9 @@ function MultiValueInput(props) {
     });
   }
   var values = Array.isArray(props.item.Value) ? props.item.Value.map(String) : [];
-  var _a = __read((0, react_1.useState)(false), 2),
-    isAdding = _a[0],
-    setIsAdding = _a[1];
+  var _b = __read((0, react_1.useState)(false), 2),
+    isAdding = _b[0],
+    setIsAdding = _b[1];
   /**
    * Persist the full list of values for a multi-value setting.
    *
@@ -8658,8 +8713,9 @@ function MultiValueInput(props) {
     })["catch"](showSaveError);
   };
   var rows = values.map(function (value, idx) {
+    var _a;
     return /*#__PURE__*/React.createElement(MultiValueRow, {
-      dataType: props.item.DataType,
+      dataType: (_a = props.item.DataType) !== null && _a !== void 0 ? _a : '',
       disabled: props.item.Disabled,
       key: "".concat(props.item.Name, "-").concat(idx),
       name: props.item.Name,
@@ -8679,7 +8735,7 @@ function MultiValueInput(props) {
   });
   if (isAdding) {
     rows.push(/*#__PURE__*/React.createElement(MultiValueRow, {
-      dataType: props.item.DataType,
+      dataType: (_a = props.item.DataType) !== null && _a !== void 0 ? _a : '',
       disabled: props.item.Disabled,
       key: "".concat(props.item.Name, "-new"),
       name: props.item.Name,

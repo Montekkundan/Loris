@@ -150,67 +150,135 @@ class Categories extends \NDB_Page implements RequestHandlerInterface
             $DB->pselect(
                 "SELECT *
                  FROM ConfigSettings
-                 WHERE Visible=1 AND CategoryID=:cid AND Parent IS NULL
-                 ORDER BY OrderNumber",
+                 WHERE Visible=1 AND CategoryID=:cid
+                 ORDER BY Parent, OrderNumber",
                 ['cid' => $categoryID]
             )
         );
 
         $config = \NDB_Config::singleton();
-        foreach ($configs as &$setting) {
-            $setting['AllowMultiple'] = boolval($setting['AllowMultiple']);
-            $settingName = strval($setting['Name']);
-            try {
-                $valueFromXML        = $config->getSettingFromXML($settingName);
-                $setting['Disabled'] = true;
-                if ($setting['DataType'] === 'mapping') {
-                    $setting['Value'] = $this->_formatMappingValue(
-                        $setting['AllowMultiple'],
-                        (array) $valueFromXML
-                    );
-                } else {
-                    $setting['Value'] = $setting['AllowMultiple'] === true
-                        ? (array) $valueFromXML
-                        : $valueFromXML;
-                }
-            } catch (\ConfigurationException $e) {
-                $setting['Disabled'] = false;
-                if ($setting['DataType'] === 'mapping') {
-                    $value = iterator_to_array(
-                        $DB->pselect(
-                            "SELECT c.ID, c.Value, cm.Value AS MappedValue
-                             FROM Config c
-                             LEFT JOIN ConfigMappings cm ON cm.ConfigID=c.ID
-                             WHERE c.ConfigID=:ID
-                             ORDER BY c.ID",
-                            ['ID' => $setting['ID']]
-                        )
-                    );
-                } else {
-                    $value = iterator_to_array(
-                        $DB->pselect(
-                            "SELECT ID, Value FROM Config WHERE ConfigID=:ID",
-                            ['ID' => $setting['ID']]
-                        )
-                    );
-                }
-
-                if ($setting['DataType'] === 'mapping') {
-                    $setting['Value'] = $this->_formatMappingValue(
-                        $setting['AllowMultiple'],
-                        $value
-                    );
-                } else if ($setting['AllowMultiple']) {
-                    $setting['Value'] = array_column($value, 'Value');
-                } else if (count($value) === 1) {
-                    $setting['Value'] = $value[0]['Value'];
-                } else {
-                    $setting['Value'] = '';
-                }
-            }
+        $childrenByParent = [];
+        foreach ($configs as $setting) {
+            $setting = $this->_formatSetting($setting, $DB, $config);
+            $parent  = $setting['Parent'] === null
+                ? 'root'
+                : strval($setting['Parent']);
+            $childrenByParent[$parent][] = $setting;
         }
 
-        return new \LORIS\Http\Response\JSON\OK(['category' => $configs]);
+        return new \LORIS\Http\Response\JSON\OK(
+            ['category' => $this->_buildSettingTree($childrenByParent, null)]
+        );
+    }
+
+    /**
+     * Build a tree from settings grouped by parent ID.
+     *
+     * @param array    $childrenByParent Settings grouped by parent
+     * @param int|null $parentID         Parent ID to build from
+     *
+     * @return array
+     */
+    private function _buildSettingTree(
+        array $childrenByParent,
+        ?int $parentID
+    ) : array {
+        $key      = $parentID === null ? 'root' : strval($parentID);
+        $settings = [];
+        foreach ($childrenByParent[$key] ?? [] as $setting) {
+            $setting['Children'] = $this->_buildSettingTree(
+                $childrenByParent,
+                intval($setting['ID'])
+            );
+            $settings[] = $setting;
+        }
+        return $settings;
+    }
+
+    /**
+     * Add value metadata to a setting row.
+     *
+     * @param array       $setting The setting row
+     * @param \Database   $DB      Database handle
+     * @param \NDB_Config $config  Runtime config
+     *
+     * @return array
+     */
+    private function _formatSetting(
+        array $setting,
+        \Database $DB,
+        \NDB_Config $config
+    ) : array {
+        $setting['AllowMultiple'] = boolval($setting['AllowMultiple']);
+        if ($setting['DataType'] === null) {
+            $setting['Disabled'] = false;
+            $setting['Value']    = '';
+            return $setting;
+        }
+
+        $settingName = strval($setting['Name']);
+        try {
+            $valueFromXML        = $config->getSettingFromXML($settingName);
+            $setting['Disabled'] = true;
+            if ($setting['DataType'] === 'mapping') {
+                $setting['Value'] = $this->_formatMappingValue(
+                    $setting['AllowMultiple'],
+                    (array) $valueFromXML
+                );
+            } else {
+                $setting['Value'] = $setting['AllowMultiple'] === true
+                    ? (array) $valueFromXML
+                    : $valueFromXML;
+            }
+        } catch (\ConfigurationException $e) {
+            $setting['Disabled'] = false;
+            $value               = $this->_getDatabaseValue($setting, $DB);
+
+            if ($setting['DataType'] === 'mapping') {
+                $setting['Value'] = $this->_formatMappingValue(
+                    $setting['AllowMultiple'],
+                    $value
+                );
+            } else if ($setting['AllowMultiple']) {
+                $setting['Value'] = array_column($value, 'Value');
+            } else if (count($value) === 1) {
+                $setting['Value'] = $value[0]['Value'];
+            } else {
+                $setting['Value'] = '';
+            }
+        }
+        return $setting;
+    }
+
+    /**
+     * Load setting values from the database.
+     *
+     * @param array     $setting The setting row
+     * @param \Database $DB      Database handle
+     *
+     * @return array
+     */
+    private function _getDatabaseValue(array $setting, \Database $DB) : array
+    {
+        if ($setting['DataType'] === 'mapping') {
+            return iterator_to_array(
+                $DB->pselect(
+                    "SELECT c.ID, c.Value, cm.Value AS MappedValue
+                     FROM Config c
+                     LEFT JOIN ConfigMappings cm ON cm.ConfigID=c.ID
+                     WHERE c.ConfigID=:ID
+                     ORDER BY c.ID",
+                    ['ID' => $setting['ID']]
+                )
+            );
+        }
+
+        return iterator_to_array(
+            $DB->pselect(
+                "SELECT ID, Value FROM Config WHERE ConfigID=:ID",
+                ['ID' => $setting['ID']]
+            )
+        );
     }
 
     /**

@@ -9,6 +9,46 @@
     margin-top: -3px;
 }
 
+.config-tree-item {
+    border-left: 1px solid #ddd;
+    margin-bottom: 8px;
+    padding-left: 10px;
+}
+
+.config-tree-header {
+    background: transparent;
+    border: 0;
+    padding: 8px 0;
+    text-align: left;
+    width: 100%;
+}
+
+.config-tree-header:disabled {
+    color: inherit;
+}
+
+.config-tree-label {
+    font-weight: 600;
+    margin-left: 6px;
+}
+
+.config-tree-name {
+    color: #777;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.config-tree-description {
+    color: #555;
+    display: block;
+    margin-left: 23px;
+}
+
+.config-tree-body {
+    margin-left: 18px;
+    padding-top: 5px;
+}
+
 .submit-area {
     margin-top: 30px;
 }

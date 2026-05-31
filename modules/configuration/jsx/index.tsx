@@ -55,9 +55,10 @@ type ConfigItem = {
   Label: string,
   Description: string,
   Value: ConfigValue,
-  DataType: string,
+  DataType: string | null,
   Disabled: boolean,
   AllowMultiple: boolean,
+  Children: ConfigItem[],
 };
 
 type ConfigOptions = {
@@ -104,6 +105,10 @@ type ItemDisplayProps = BaseURLProps & {
   item: ConfigItem,
   options: ConfigOptions,
   reloadCategory: ReloadCategory,
+};
+
+type ConfigTreeItemProps = ItemDisplayProps & {
+  level: number,
 };
 
 type MultiValueRowProps = {
@@ -221,16 +226,79 @@ function DevName(props: DevNameProps): React.ReactElement | null {
  */
 function CategoryDisplay(props: CategoryDisplayProps): React.ReactElement {
   const rows = props.items.map((item) => (
-    <ItemDisplay
+    <ConfigTreeItem
       key={item.ID}
       baseURL={props.baseURL}
       item={item}
+      level={0}
       options={props.options}
       reloadCategory={props.reloadCategory}
     />
   ));
 
   return <div className="col-md-9">{rows}</div>;
+}
+
+/**
+ * Collapsible configuration tree item.
+ *
+ * @param {ConfigTreeItemProps} props React props
+ * @return {JSX}
+ */
+function ConfigTreeItem(props: ConfigTreeItemProps): React.ReactElement {
+  const [isOpen, setIsOpen] = useState(false);
+  const children = props.item.Children ?? [];
+  const hasInput = props.item.DataType !== null && props.item.DataType !== '';
+  const canExpand = hasInput || children.length > 0;
+
+  return (
+    <div
+      className="config-tree-item"
+      style={{marginLeft: `${Math.min(props.level, 4) * 15}px`}}
+    >
+      <button
+        className="config-tree-header"
+        disabled={!canExpand}
+        onClick={() => setIsOpen(!isOpen)}
+        type="button"
+      >
+        <span
+          className={`glyphicon glyphicon-chevron-${isOpen ? 'down' : 'right'}`}
+        ></span>
+        <span className="config-tree-label">
+          {props.item.Label || props.item.Name}
+        </span>
+        <span className="config-tree-name">{props.item.Name}</span>
+        {props.item.Description && (
+          <span className="config-tree-description">
+            {props.item.Description}
+          </span>
+        )}
+      </button>
+      {isOpen && (
+        <div className="config-tree-body">
+          {hasInput && (
+            <ItemDisplay
+              baseURL={props.baseURL}
+              item={props.item}
+              options={props.options}
+              reloadCategory={props.reloadCategory}
+            />
+          )}
+          {children.map((child) => (
+            <ConfigTreeItem
+              key={child.ID}
+              baseURL={props.baseURL}
+              item={child}
+              level={props.level + 1}
+              options={props.options}
+              reloadCategory={props.reloadCategory}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -314,7 +382,7 @@ function SingleValueInput(props: ItemDisplayProps): React.ReactElement {
   }
 
   return renderInput({
-    dataType: props.item.DataType,
+    dataType: props.item.DataType ?? '',
     disabled: props.item.Disabled,
     label: props.item.Label,
     name: props.item.Name,
@@ -364,7 +432,7 @@ function MultiValueInput(props: ItemDisplayProps): React.ReactElement {
 
   const rows = values.map((value, idx) => (
     <MultiValueRow
-      dataType={props.item.DataType}
+      dataType={props.item.DataType ?? ''}
       disabled={props.item.Disabled}
       key={`${props.item.Name}-${idx}`}
       name={props.item.Name}
@@ -382,7 +450,7 @@ function MultiValueInput(props: ItemDisplayProps): React.ReactElement {
   if (isAdding) {
     rows.push(
       <MultiValueRow
-        dataType={props.item.DataType}
+        dataType={props.item.DataType ?? ''}
         disabled={props.item.Disabled}
         key={`${props.item.Name}-new`}
         name={props.item.Name}
