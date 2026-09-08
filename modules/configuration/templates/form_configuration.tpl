@@ -95,7 +95,11 @@
             </button>
         </span>
     </div>
-    {if !$image_upload_enabled}
+    {if $image_upload_enabled}
+        <p class="help-block">
+            Use a filename like <code>partner_logo_name.png</code>.
+        </p>
+    {else}
         <p class="help-block">
             {$image_upload_error|default:"The configuration upload directory is not writable."|escape:html}
         </p>

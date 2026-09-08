@@ -77,7 +77,8 @@ class Upload extends \LORIS\Http\Endpoint
 
         if (!$images->validateUpload($filename, $tempPath)) {
             return new \LORIS\Http\Response\JSON\UnsupportedMediaType(
-                'Upload a PNG, JPEG, GIF, or WebP image with a safe filename'
+                'Upload a PNG, JPEG, GIF, or WebP image named like '
+                . 'partner_logo_name.png'
             );
         }
 

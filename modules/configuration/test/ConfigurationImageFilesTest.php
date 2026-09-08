@@ -84,7 +84,7 @@ class ConfigurationImageFilesTest extends TestCase
     }
 
     /**
-     * Uploaded files must contain a supported image matching their extension.
+     * Uploaded files must follow the logo naming convention and match their type.
      *
      * @return void
      */
@@ -95,11 +95,26 @@ class ConfigurationImageFilesTest extends TestCase
 
         $images = new ImageFiles($this->root, $this->uploads);
 
-        $this->assertTrue($images->validateUpload('study-logo.png', $png));
-        $this->assertFalse($images->validateUpload('study-logo.jpg', $png));
-        $this->assertFalse($images->validateUpload('../study-logo.png', $png));
-        $this->assertFalse($images->validateUpload('study logo.png', $png));
-        $this->assertFalse($images->validateUpload('study-logo.svg', $png));
+        $this->assertTrue(
+            $images->validateUpload('partner_logo_study.png', $png)
+        );
+        $this->assertTrue(
+            $images->validateUpload('login_logo_left.png', $png)
+        );
+        $this->assertFalse(
+            $images->validateUpload('partner_logo_study.jpg', $png)
+        );
+        $this->assertFalse(
+            $images->validateUpload('../partner_logo_study.png', $png)
+        );
+        $this->assertFalse(
+            $images->validateUpload('partner logo study.png', $png)
+        );
+        $this->assertFalse($images->validateUpload('study-logo.png', $png));
+        $this->assertFalse($images->validateUpload('partner_logo_.png', $png));
+        $this->assertFalse(
+            $images->validateUpload('partner_logo_study.svg', $png)
+        );
     }
 
     /**
@@ -112,8 +127,8 @@ class ConfigurationImageFilesTest extends TestCase
         $images = new ImageFiles($this->root, $this->uploads);
 
         $this->assertSame(
-            '/images/configuration/study-logo.png',
-            $images->getUploadedPath('study-logo.png')
+            '/images/configuration/partner_logo_study.png',
+            $images->getUploadedPath('partner_logo_study.png')
         );
     }
 

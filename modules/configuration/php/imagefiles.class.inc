@@ -136,7 +136,7 @@ class ImageFiles
     }
 
     /**
-     * Check whether a client filename is safe and URL-friendly.
+     * Check whether a client filename follows the configuration logo convention.
      *
      * @param string $filename Client-provided filename
      *
@@ -144,8 +144,10 @@ class ImageFiles
      */
     private function _validFilename(string $filename): bool
     {
-        return !str_contains($filename, '..')
-            && preg_match('/^[[:alnum:]][[:alnum:]_.-]*$/', $filename) === 1;
+        return preg_match(
+            '/^[[:alnum:]]+_logo_[[:alnum:]][[:alnum:]_-]*\.[[:alnum:]]+$/',
+            $filename
+        ) === 1;
     }
 
     /**
