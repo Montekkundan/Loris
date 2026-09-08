@@ -106,6 +106,38 @@ class DicomArchiveTestIntegrationTest extends LorisIntegrationTest
     }
 
     /**
+     * Tests that the view-details JSON contains only page metadata.
+     *
+     * @return void
+     */
+    function testDicomArchiveViewDetailsJsonDoesNotExposeUnusedColumns()
+    {
+        $this->safeGet(
+            $this->url
+            . "/dicom_archive/viewDetails/?tarchiveID=27&format=json"
+        );
+        $bodyText = $this->safeFindElement(WebDriverBy::cssSelector("body"))
+            ->getText();
+        $data     = json_decode($bodyText, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertArrayHasKey('archive', $data);
+        $this->assertArrayHasKey('archiveSeries', $data);
+        $this->assertArrayHasKey('archiveFiles', $data);
+        $this->assertArrayNotHasKey('AcquisitionMetadata', $data['archive']);
+        $this->assertArrayNotHasKey('SessionID', $data['archive']);
+        $this->assertArrayNotHasKey('TarchiveID', $data['archive']);
+        $this->assertArrayNotHasKey('Modality', $data['archiveSeries'][0]);
+        $this->assertArrayNotHasKey(
+            'TarchiveSeriesID',
+            $data['archiveSeries'][0]
+        );
+        $this->assertArrayNotHasKey(
+            'TarchiveFileID',
+            $data['archiveFiles'][0]
+        );
+    }
+
+    /**
      * Tests that help editor loads with the permission
      *
      * @return void
