@@ -311,7 +311,7 @@ function SeriesDetails({
           </thead>
           <tbody>
             {series.map((record, index) => (
-              <tr key={displayValue(record.SeriesUID) || index}>
+              <tr key={index}>
                 {SERIES_COLUMNS.map(([key]) => (
                   <td key={key}>
                     {key === 'SeriesUID' ? (
